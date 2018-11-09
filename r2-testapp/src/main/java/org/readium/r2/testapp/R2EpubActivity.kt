@@ -118,17 +118,17 @@ class R2EpubActivity : R2EpubActivity() {
 
                 if (!ttsOn) {
                     ttsOn = true
-
                     screenReader.configureTTS()
 
                     if (URI(resourceHref).isAbsolute) {
                         screenReader.read(screenReader.getText("", "", resourceHref))
                     } else {
                         val text = screenReader.getText("$BASE_URL:$port/", epubName, resourceHref)
-                        println("Texte : $text")
                         screenReader.read(text)
                     }
+
                     item.title = resources.getString(R.string.epubactivity_accessibility_screen_reader_stop)
+
                 } else {
                     ttsOn = false
                     screenReader.stop()

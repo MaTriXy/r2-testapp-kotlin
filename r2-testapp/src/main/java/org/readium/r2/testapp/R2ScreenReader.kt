@@ -29,8 +29,7 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
                 initialized = (status != TextToSpeech.ERROR)
             })
 
-
-
+    
     private fun isInitialized(): Boolean {
         return initialized
     }
