@@ -14,12 +14,31 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:context='org.readium.r2.testapp.R2EpubActivity'>
 
+
     <item
         android:id="@+id/drm"
         android:icon="@drawable/icon_drm"
         android:title="@string/epubactivity_drm_info"
         app:showAsAction="always|always"
         tools:ignore="AlwaysShowAction">
+    </item>
+
+    <item
+        android:id="@+id/accessibility"
+        android:icon="@drawable/icon_accessibility"
+        android:title="@string/epubactivity_accessibility"
+        app:showAsAction="always|always"
+        tools:ignore="AlwaysShowAction">
+
+        <menu xmlns:app="http://schemas.android.com/apk/res-auto"
+            xmlns:android="http://schemas.android.com/apk/res/android"
+            xmlns:tools="http://schemas.android.com/tools">
+
+            <item
+                android:id="@+id/screen_reader"
+                android:title="@string/epubactivity_accessibility_screen_reader_start">
+            </item>
+        </menu>
     </item>
 
     <item
@@ -38,7 +57,6 @@
         tools:ignore="AlwaysShowAction">
     </item>
 
-
     <item
         android:id="@+id/toc"
         android:icon="@drawable/icon_menu"
@@ -46,5 +64,6 @@
         app:showAsAction="always|always"
         tools:ignore="AlwaysShowAction">
     </item>
+
 
 </menu>
