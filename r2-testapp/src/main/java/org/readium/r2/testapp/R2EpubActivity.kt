@@ -18,14 +18,17 @@ import android.os.Handler
 import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
+import android.view.SubMenu
 import android.widget.TextView
 import org.jetbrains.anko.intentFor
 import org.jetbrains.anko.toast
 import org.json.JSONObject
+import org.readium.r2.navigator.BASE_URL
 import org.readium.r2.navigator.R2EpubActivity
 import org.readium.r2.shared.Locations
 import org.readium.r2.shared.LocatorText
 import org.readium.r2.shared.drm.DRMModel
+import java.net.URI
 
 /**
  * R2EpubActivity : Extension of the R2EpubActivity() from navigator
@@ -36,16 +39,21 @@ import org.readium.r2.shared.drm.DRMModel
  */
 class R2EpubActivity : R2EpubActivity() {
 
-    // List of bookmarks on activity_outline_container.xml
-    private var menuBmk: MenuItem? = null
-
     // Provide access to the Bookmarks & Positions Databases
     private lateinit var bookmarksDB: BookmarksDatabase
     private lateinit var positionsDB: PositionsDatabase
 
+    private lateinit var screenReader: R2ScreenReader
+    private var ttsOn = false
+
     protected var drmModel: DRMModel? = null
     protected var menuDrm: MenuItem? = null
     protected var menuToc: MenuItem? = null
+    protected var menuBmk: MenuItem? = null
+
+    protected var menuAccessibility: SubMenu? = null
+    protected var menuScreenReader: MenuItem? = null
+
     private var bookId: Long = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -75,7 +83,6 @@ class R2EpubActivity : R2EpubActivity() {
         resourcePager.setBackgroundColor(Color.parseColor(backgroundsColors[appearancePref]))
         (resourcePager.focusedChild?.findViewById(org.readium.r2.navigator.R.id.book_title) as? TextView)?.setTextColor(Color.parseColor(textColors[appearancePref]))
         toggleActionBar()
-
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -83,6 +90,10 @@ class R2EpubActivity : R2EpubActivity() {
         menuDrm = menu?.findItem(R.id.drm)
         menuToc = menu?.findItem(R.id.toc)
         menuBmk = menu?.findItem(R.id.bookmark)
+
+        menuAccessibility = menu?.findItem(R.id.accessibility)?.subMenu
+        menuScreenReader = menuAccessibility?.findItem(R.id.screen_reader)
+
         menuDrm?.isVisible = false
         return true
     }
@@ -99,6 +110,31 @@ class R2EpubActivity : R2EpubActivity() {
             }
             R.id.settings -> {
                 userSettings.userSettingsPopUp().showAsDropDown(this.findViewById(R.id.toc), 0, 0, Gravity.END)
+                return true
+            }
+            R.id.screen_reader -> {
+                val port = preferences.getString("$publicationIdentifier-publicationPort", 0.toString()).toInt()
+                val resourceHref = publication.spine[resourcePager.currentItem].href!!
+
+                if (!ttsOn) {
+                    ttsOn = true
+
+                    screenReader.configureTTS()
+
+                    if (URI(resourceHref).isAbsolute) {
+                        screenReader.read(screenReader.getText("", "", resourceHref))
+                    } else {
+                        val text = screenReader.getText("$BASE_URL:$port/", epubName, resourceHref)
+                        println("Texte : $text")
+                        screenReader.read(text)
+                    }
+                    item.title = resources.getString(R.string.epubactivity_accessibility_screen_reader_stop)
+                } else {
+                    ttsOn = false
+                    screenReader.stop()
+                    item.title = resources.getString(R.string.epubactivity_accessibility_screen_reader_start)
+                }
+
                 return true
             }
             R.id.drm -> {
@@ -148,6 +184,24 @@ class R2EpubActivity : R2EpubActivity() {
         } else {
             super.onActivityResult(requestCode, resultCode, data)
         }
+    }
+
+    override fun onPause() {
+        screenReader.shutdown()
+
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        screenReader.shutdown()
+
+        super.onDestroy()
+    }
+
+    override fun onResume() {
+        screenReader = R2ScreenReader(this, publication)
+
+        super.onResume()
     }
 
 }
