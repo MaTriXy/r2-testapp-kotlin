@@ -125,7 +125,7 @@ class R2EpubActivity : R2EpubActivity() {
                 val port = preferences.getString("$publicationIdentifier-publicationPort", 0.toString()).toInt()
                 val resourceHref = publication.spine[resourcePager.currentItem].href!!
 
-                if (!screenReader.isTTSSpeaking()) {
+                if (!screenReader.isTTSSpeaking() && !screenReader.isNotPaused()) {
                     ttsOn = true
                     menuScreenReaderPause?.isVisible = true
                     screenReader.configureTTS()
