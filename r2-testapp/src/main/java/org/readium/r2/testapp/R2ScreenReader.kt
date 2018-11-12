@@ -163,7 +163,7 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
         return textToSpeech.isSpeaking
     }
 
-    fun isNotPaused(): Boolean {
+    fun isPaused(): Boolean {
         return paused
     }
 
