@@ -53,6 +53,7 @@ class R2EpubActivity : R2EpubActivity() {
 
     protected var menuAccessibility: SubMenu? = null
     protected var menuScreenReader: MenuItem? = null
+    protected var menuScreenReaderPause: MenuItem? = null
 
     private var bookId: Long = -1
 
@@ -93,6 +94,7 @@ class R2EpubActivity : R2EpubActivity() {
 
         menuAccessibility = menu?.findItem(R.id.accessibility)?.subMenu
         menuScreenReader = menuAccessibility?.findItem(R.id.screen_reader)
+        menuScreenReaderPause = menuAccessibility?.findItem(R.id.screen_reader_pause)
 
         menuDrm?.isVisible = false
         return true
@@ -112,27 +114,51 @@ class R2EpubActivity : R2EpubActivity() {
                 userSettings.userSettingsPopUp().showAsDropDown(this.findViewById(R.id.toc), 0, 0, Gravity.END)
                 return true
             }
+            R.id.accessibility -> {
+                if (!screenReader.isTTSSpeaking() && !screenReader.isNotPaused()) {
+                    menuScreenReaderPause?.isVisible = false
+                    menuAccessibility?.findItem(R.id.screen_reader)?.title = resources.getString(R.string.epubactivity_accessibility_screen_reader_start)
+                }
+                return true
+            }
             R.id.screen_reader -> {
                 val port = preferences.getString("$publicationIdentifier-publicationPort", 0.toString()).toInt()
                 val resourceHref = publication.spine[resourcePager.currentItem].href!!
 
-                if (!ttsOn) {
+                if (!screenReader.isTTSSpeaking()) {
                     ttsOn = true
+                    menuScreenReaderPause?.isVisible = true
                     screenReader.configureTTS()
 
                     if (URI(resourceHref).isAbsolute) {
-                        screenReader.read(screenReader.getText("", "", resourceHref))
+                        val text = screenReader.getText("", "", resourceHref)
+                        screenReader.startReading(text)
                     } else {
                         val text = screenReader.getText("$BASE_URL:$port/", epubName, resourceHref)
-                        screenReader.read(text)
+                        screenReader.startReading(text)
                     }
 
                     item.title = resources.getString(R.string.epubactivity_accessibility_screen_reader_stop)
 
                 } else {
                     ttsOn = false
-                    screenReader.stop()
+                    menuScreenReaderPause?.isVisible = false
+
+                    screenReader.stopReading()
                     item.title = resources.getString(R.string.epubactivity_accessibility_screen_reader_start)
+                }
+
+                return true
+            }
+            R.id.screen_reader_pause -> {
+                if (!ttsOn) {
+                    ttsOn = true
+                    screenReader.resumeReading()
+                    item.title = resources.getString(R.string.epubactivity_accessibility_screen_reader_pause)
+                } else {
+                    ttsOn = false
+                    screenReader.pauseReading()
+                    item.title = resources.getString(R.string.epubactivity_accessibility_screen_reader_resume)
                 }
 
                 return true
