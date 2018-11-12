@@ -115,7 +115,7 @@ class R2EpubActivity : R2EpubActivity() {
                 return true
             }
             R.id.accessibility -> {
-                if (!screenReader.isTTSSpeaking() && !screenReader.isNotPaused()) {
+                if (!screenReader.isTTSSpeaking() && !screenReader.isPaused()) {
                     menuScreenReaderPause?.isVisible = false
                     menuAccessibility?.findItem(R.id.screen_reader)?.title = resources.getString(R.string.epubactivity_accessibility_screen_reader_start)
                 }
@@ -125,7 +125,7 @@ class R2EpubActivity : R2EpubActivity() {
                 val port = preferences.getString("$publicationIdentifier-publicationPort", 0.toString()).toInt()
                 val resourceHref = publication.spine[resourcePager.currentItem].href!!
 
-                if (!screenReader.isTTSSpeaking() && !screenReader.isNotPaused()) {
+                if (!screenReader.isTTSSpeaking() && !screenReader.isPaused()) {
                     ttsOn = true
                     menuScreenReaderPause?.isVisible = true
                     screenReader.configureTTS()
