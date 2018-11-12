@@ -35,7 +35,9 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
     private var initialized = false
     private var paused = false
 
-    private var fullText = mutableListOf<String>()
+    private var utterances = mutableListOf<String>()
+    private val currentUtterance = mutableListOf<String>()
+    private var resourceLength: Int = -1
 
     private val textToSpeech = TextToSpeech(context,
             TextToSpeech.OnInitListener { status ->
@@ -61,10 +63,14 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
             //checking progression
             textToSpeech.setOnUtteranceProgressListener(object: UtteranceProgressListener() {
                 override fun onDone(p0: String?) {
-                    //When the current utterance is done spoken, we removed it from the current text
-                    fullText.removeAt(0)
+                    currentUtterance.add(utterances.first())
 
-                    if (fullText.isEmpty()) {
+                    //When the current utterance is done spoken, we removed it from the current text
+                    utterances.removeAt(0)
+
+                    val progression = currentUtterance.size / resourceLength
+
+                    if (utterances.isEmpty()) {
                         stopReading()
 
                         //TODO
@@ -77,7 +83,6 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
                 }
 
                 override fun onError(p0: String?) {
-                    //TODO
                     //Even though it's deprecated, still needed to instantiate UtteranceProgressListener object
                 }
             })
@@ -97,11 +102,12 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
 
 
     fun startReading(text: List<String>) {
-        if (fullText.isEmpty() && !paused) {
-            fullText = text as MutableList<String>
+        if (utterances.isEmpty() && !paused) {
+            utterances = text as MutableList<String>
+            resourceLength = utterances.size
         }
 
-        for (bitsOfText in fullText) {
+        for (bitsOfText in utterances) {
             textToSpeech.speak(bitsOfText, TextToSpeech.QUEUE_ADD, null, "")
         }
     }
@@ -112,13 +118,13 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
     }
 
     fun resumeReading() {
-        startReading(fullText)
+        startReading(utterances)
     }
 
     fun stopReading() {
-        textToSpeech.stop()
         paused = false
-        fullText.clear()
+        textToSpeech.stop()
+        utterances.clear()
     }
 
 
