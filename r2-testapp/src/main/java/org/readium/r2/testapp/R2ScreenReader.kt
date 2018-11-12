@@ -36,8 +36,9 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
     private var paused = false
 
     private var utterances = mutableListOf<String>()
-    private val currentUtterance = mutableListOf<String>()
+    private var utterancesProgression: Int = 0
     private var resourceLength: Int = -1
+    private var progression: Double = 0.0
 
     private val textToSpeech = TextToSpeech(context,
             TextToSpeech.OnInitListener { status ->
@@ -63,18 +64,21 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
             //checking progression
             textToSpeech.setOnUtteranceProgressListener(object: UtteranceProgressListener() {
                 override fun onDone(p0: String?) {
-                    currentUtterance.add(utterances.first())
+                    utterancesProgression += (utterances.first()).length
 
                     //When the current utterance is done spoken, we removed it from the current text
                     utterances.removeAt(0)
 
-                    val progression = currentUtterance.size / resourceLength
+                    progression = (utterancesProgression.toDouble() / resourceLength.toDouble())
 
                     if (utterances.isEmpty()) {
                         stopReading()
 
                         //TODO
                         //Go to next resource
+
+
+                        utterancesProgression = 0
                     }
                 }
 
@@ -104,7 +108,6 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
     fun startReading(text: List<String>) {
         if (utterances.isEmpty() && !paused) {
             utterances = text as MutableList<String>
-            resourceLength = utterances.size
         }
 
         for (bitsOfText in utterances) {
@@ -148,6 +151,8 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
 
         thread.start()
         thread.join()
+
+        resourceLength = plainTextFromHTML.length
 
         return plainTextFromHTML.split(".")
     }
