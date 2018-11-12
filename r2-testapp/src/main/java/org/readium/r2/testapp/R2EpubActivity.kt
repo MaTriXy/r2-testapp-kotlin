@@ -218,12 +218,6 @@ class R2EpubActivity : R2EpubActivity() {
         }
     }
 
-    override fun onPause() {
-        screenReader.shutdown()
-
-        super.onPause()
-    }
-
     override fun onDestroy() {
         screenReader.shutdown()
 
