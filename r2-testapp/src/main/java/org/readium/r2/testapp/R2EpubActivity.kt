@@ -131,10 +131,10 @@ class R2EpubActivity : R2EpubActivity() {
                     screenReader.configureTTS()
 
                     if (URI(resourceHref).isAbsolute) {
-                        val text = screenReader.getText("", "", resourceHref)
+                        val text = screenReader.getUtterances("", "", resourceHref)
                         screenReader.startReading(text)
                     } else {
-                        val text = screenReader.getText("$BASE_URL:$port/", epubName, resourceHref)
+                        val text = screenReader.getUtterances("$BASE_URL:$port/", epubName, resourceHref)
                         screenReader.startReading(text)
                     }
 
