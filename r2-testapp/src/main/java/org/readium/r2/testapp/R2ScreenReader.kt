@@ -66,6 +66,9 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
 
                     if (fullText.isEmpty()) {
                         stopReading()
+
+                        //TODO
+                        //Go to next resource
                     }
                 }
 
@@ -119,7 +122,7 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
     }
 
 
-    fun getText(baseURL: String, epubName: String, resourceHref: String): List<String> {
+    fun getUtterances(baseURL: String, epubName: String, resourceHref: String): List<String> {
         var plainTextFromHTML = ""
 
         val thread = Thread(Runnable {
