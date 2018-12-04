@@ -15,20 +15,22 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
+import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
 import android.view.SubMenu
+import android.view.accessibility.AccessibilityManager
 import android.widget.TextView
 import org.jetbrains.anko.intentFor
 import org.jetbrains.anko.toast
 import org.json.JSONObject
 import org.readium.r2.navigator.BASE_URL
 import org.readium.r2.navigator.R2EpubActivity
-import org.readium.r2.shared.Locations
-import org.readium.r2.shared.LocatorText
+import org.readium.r2.shared.*
 import org.readium.r2.shared.drm.DRMModel
 import java.net.URI
+
 
 /**
  * R2EpubActivity : Extension of the R2EpubActivity() from navigator
@@ -38,6 +40,16 @@ import java.net.URI
  *
  */
 class R2EpubActivity : R2EpubActivity() {
+
+    //UserSettings
+    lateinit var userSettings: UserSettings
+
+    //Accessibility
+    private var isExploreByTouchEnabled = false
+    private var pageEnded = false
+
+    // List of bookmarks on activity_outline_container.xml
+    private var menuBmk: MenuItem? = null
 
     // Provide access to the Bookmarks & Positions Databases
     private lateinit var bookmarksDB: BookmarksDatabase
@@ -78,7 +90,7 @@ class R2EpubActivity : R2EpubActivity() {
             }
         }, 100)
 
-        val appearancePref = preferences.getInt("appearance", 0)
+        val appearancePref = preferences.getInt(APPEARANCE_REF, 0)
         val backgroundsColors = mutableListOf("#ffffff", "#faf4e8", "#000000")
         val textColors = mutableListOf("#000000", "#000000", "#ffffff")
         resourcePager.setBackgroundColor(Color.parseColor(backgroundsColors[appearancePref]))
@@ -218,16 +230,54 @@ class R2EpubActivity : R2EpubActivity() {
         }
     }
 
-    override fun onDestroy() {
-        screenReader.shutdown()
+    override fun onResume() {
+        super.onResume()
 
-        super.onDestroy()
+        /*
+         * If TalkBack or any touch exploration service is activated
+         * we force scroll mode (and override user preferences)
+         */
+        val am = getSystemService(ACCESSIBILITY_SERVICE) as AccessibilityManager
+        isExploreByTouchEnabled = am.isTouchExplorationEnabled
+
+        if (isExploreByTouchEnabled) {
+
+            //Preset & preferences adapted
+            publication.userSettingsUIPreset.put(ReadiumCSSName.ref(SCROLL_REF), true)
+            preferences.edit().putBoolean(SCROLL_REF, true).apply() //overriding user preferences
+
+            userSettings = UserSettings(preferences, this, publication.userSettingsUIPreset)
+            userSettings.saveChanges()
+
+            Handler().postDelayed({
+                userSettings.resourcePager = resourcePager
+                userSettings.updateViewCSS(SCROLL_REF)
+            }, 500)
+        } else {
+            if (publication.cssStyle != ContentLayoutStyle.cjkv.name) {
+                publication.userSettingsUIPreset.remove(ReadiumCSSName.ref(SCROLL_REF))
+            }
+
+            userSettings = UserSettings(preferences, this, publication.userSettingsUIPreset)
+            userSettings.resourcePager = resourcePager
+        }
     }
 
-    override fun onResume() {
-        screenReader = R2ScreenReader(this, publication)
 
-        super.onResume()
+    override fun onDestroy() {
+        super.onDestroy()
+
+    }
+
+
+    override fun onPageEnded(end: Boolean) {
+        if (isExploreByTouchEnabled) {
+            if (!pageEnded == end && end) {
+                toast("End of chapter")
+            }
+
+            pageEnded = end
+        }
     }
 
 }
