@@ -25,7 +25,7 @@
 
     <item
         android:id="@+id/accessibility"
-        android:icon="@drawable/icon_accessibility"
+        android:icon="@drawable/icon_audio"
         android:title="@string/epubactivity_accessibility"
         app:showAsAction="always|always"
         tools:ignore="AlwaysShowAction">
