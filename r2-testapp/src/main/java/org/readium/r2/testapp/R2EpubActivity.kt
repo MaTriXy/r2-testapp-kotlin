@@ -15,7 +15,6 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
-import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
@@ -29,7 +28,6 @@ import org.readium.r2.navigator.BASE_URL
 import org.readium.r2.navigator.R2EpubActivity
 import org.readium.r2.shared.*
 import org.readium.r2.shared.drm.DRMModel
-import java.net.URI
 
 
 /**
@@ -47,9 +45,6 @@ class R2EpubActivity : R2EpubActivity() {
     //Accessibility
     private var isExploreByTouchEnabled = false
     private var pageEnded = false
-
-    // List of bookmarks on activity_outline_container.xml
-    private var menuBmk: MenuItem? = null
 
     // Provide access to the Bookmarks & Positions Databases
     private lateinit var bookmarksDB: BookmarksDatabase
@@ -140,15 +135,9 @@ class R2EpubActivity : R2EpubActivity() {
                 if (!screenReader.isTTSSpeaking() && !screenReader.isPaused()) {
                     ttsOn = true
                     menuScreenReaderPause?.isVisible = true
-                    screenReader.configureTTS()
 
-                    if (URI(resourceHref).isAbsolute) {
-                        val text = screenReader.getUtterances("", "", resourceHref)
-                        screenReader.startReading(text)
-                    } else {
-                        val text = screenReader.getUtterances("$BASE_URL:$port/", epubName, resourceHref)
-                        screenReader.startReading(text)
-                    }
+                    screenReader.configureTTS("$BASE_URL:$port/$epubName$resourceHref")
+                    screenReader.startReading()
 
                     item.title = resources.getString(R.string.epubactivity_accessibility_screen_reader_stop)
 
@@ -261,12 +250,22 @@ class R2EpubActivity : R2EpubActivity() {
             userSettings = UserSettings(preferences, this, publication.userSettingsUIPreset)
             userSettings.resourcePager = resourcePager
         }
+
+
+        /*
+         * Initialisation of the screen reader
+         */
+        Handler().postDelayed({
+            screenReader = R2ScreenReader(this, publication)
+        }, 500)
+
     }
 
 
     override fun onDestroy() {
         super.onDestroy()
 
+        screenReader.shutdown()
     }
 
 

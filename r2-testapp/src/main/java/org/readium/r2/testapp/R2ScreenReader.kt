@@ -13,11 +13,14 @@ package org.readium.r2.testapp
 import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import android.text.Html
+import android.webkit.WebView
 import android.widget.Toast
+import org.jsoup.Jsoup
+import org.readium.r2.navigator.pager.R2EpubPageFragment
+import org.readium.r2.navigator.pager.R2PagerAdapter
 import org.readium.r2.shared.Publication
-import java.net.URI
-import java.net.URL
+import java.io.IOException
+import java.lang.ref.WeakReference
 import java.util.*
 
 
@@ -36,58 +39,122 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
     private var paused = false
 
     private var utterances = mutableListOf<String>()
+    private var utterancesCurrentIndex: Int = 0
+    private var currentResourceHref: String? = null
+
+    /*
+     * May prove useful
     private var utterancesProgression: Int = 0
     private var resourceLength: Int = -1
     private var progression: Double = 0.0
+    */
 
-    private val textToSpeech = TextToSpeech(context,
-            TextToSpeech.OnInitListener { status ->
-                initialized = (status != TextToSpeech.ERROR)
-            })
+    private var textToSpeech: TextToSpeech? = null
+
+    private val activityReference: WeakReference<R2EpubActivity>
+    private var webView: WebView? = null
 
 
+    init {
+        //Initialize reference
+        activityReference = WeakReference(context as R2EpubActivity)
 
-    private fun isInitialized(): Boolean {
+        //Initialize TTS
+        textToSpeech = TextToSpeech(context,
+                TextToSpeech.OnInitListener { status ->
+                    initialized = (status != TextToSpeech.ERROR)
+                })
+
+
+        //Create webview reference
+        val adapter = activityReference.get()?.resourcePager?.adapter as R2PagerAdapter
+        val fragment = (adapter.mFragments.get((adapter).getItemId(activityReference.get()?.resourcePager!!.currentItem))) as? R2EpubPageFragment
+        webView = fragment?.webView
+    }
+
+
+    fun isInitialized(): Boolean {
         return initialized
     }
 
 
-    fun configureTTS() {
+    fun configureTTS(resourceHref: String) {
         if (isInitialized()) {
-            val language = textToSpeech.setLanguage(Locale(publication.metadata.languages.firstOrNull()))
+            val language = textToSpeech?.setLanguage(Locale(publication.metadata.languages.firstOrNull()))
 
             if (language == TextToSpeech.LANG_MISSING_DATA || language == TextToSpeech.LANG_NOT_SUPPORTED) {
                 Toast.makeText(context.applicationContext, "There was an error with the TTS language, switching to EN-US", Toast.LENGTH_LONG).show()
-                textToSpeech.language = Locale.US
+                textToSpeech?.language = Locale.US
             }
 
+            //Load resource as sentences
+            utterances = mutableListOf()
+            currentResourceHref = resourceHref
+            getUtterances(currentResourceHref)
+
+            //emptying TTS' queue
+            flushUtterancesQueue()
+
             //checking progression
-            textToSpeech.setOnUtteranceProgressListener(object: UtteranceProgressListener() {
-                override fun onDone(p0: String?) {
-                    utterancesProgression += (utterances.first()).length
+            textToSpeech?.setOnUtteranceProgressListener(object: UtteranceProgressListener() {
+                /**
+                 * Called when an utterance "starts" as perceived by the caller. This will
+                 * be soon before audio is played back in the case of a [TextToSpeech.speak]
+                 * or before the first bytes of a file are written to the file system in the case
+                 * of [TextToSpeech.synthesizeToFile].
+                 *
+                 * @param utteranceId The utterance ID of the utterance.
+                 */
+                override fun onStart(utteranceId: String?) {
+                    utterancesCurrentIndex = utteranceId!!.toInt()
 
-                    //When the current utterance is done spoken, we removed it from the current text
-                    utterances.removeAt(0)
+                    val toHighlight = utterances[utterancesCurrentIndex]
 
-                    progression = (utterancesProgression.toDouble() / resourceLength.toDouble())
-
-                    if (utterances.isEmpty()) {
-                        stopReading()
-
-                        //TODO
-                        //Go to next resource
-
-
-                        utterancesProgression = 0
+                    (webView as WebView).post {
+                        (webView as WebView).evaluateJavascript("findUtterance(\"$toHighlight\");", null)
                     }
                 }
 
-                override fun onStart(p0: String?) {
-                    //nothing to do
+                /**
+                 * Called when an utterance is stopped, whether voluntarily by the user, or not.
+                 *
+                 * @param utteranceId The utterance ID of the utterance.
+                 * @param interrupted Whether or not the speaking has been interrupted.
+                 */
+
+                override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                    if (interrupted) {
+                        (webView as WebView).post {
+                            (webView as WebView).evaluateJavascript("setHighlight();", null)
+                        }
+                    }
                 }
 
-                override fun onError(p0: String?) {
-                    //Even though it's deprecated, still needed to instantiate UtteranceProgressListener object
+                /**
+                 * Called when an utterance has successfully completed processing.
+                 * All audio will have been played back by this point for audible output, and all
+                 * output will have been written to disk for file synthesis requests.
+                 *
+                 * This request is guaranteed to be called after [.onStart].
+                 *
+                 * @param utteranceId The utterance ID of the utterance.
+                 */
+                override fun onDone(utteranceId: String?) {
+                    (webView as WebView).post {
+                        (webView as WebView).evaluateJavascript("setHighlight();", null)
+                    }
+                }
+
+                /**
+                 * Called when an error has occurred during processing. This can be called
+                 * at any point in the synthesis process. Note that there might be calls
+                 * to [.onStart] for specified utteranceId but there will never
+                 * be a call to both [.onDone] and [.onError] for
+                 * the same utterance.
+                 *
+                 * @param utteranceId The utterance ID of the utterance.
+                 */
+                override fun onError(utteranceId: String?) {
                 }
             })
 
@@ -101,66 +168,96 @@ class R2ScreenReader(private val context: Context, private val publication: Publ
 
         stopReading()
 
-        textToSpeech.shutdown()
+        textToSpeech?.shutdown()
     }
 
 
-    fun startReading(text: List<String>) {
-        if (utterances.isEmpty() && !paused) {
-            utterances = text as MutableList<String>
-        }
-
-        for (bitsOfText in utterances) {
-            textToSpeech.speak(bitsOfText, TextToSpeech.QUEUE_ADD, null, "")
+    fun startReading() {
+        var index = 0
+        for (sentences in utterances) {
+            textToSpeech?.speak(sentences, TextToSpeech.QUEUE_ADD, null, index.toString())
+            index++
         }
     }
 
     fun pauseReading() {
         paused = true
-        textToSpeech.stop()
+        textToSpeech?.stop()
     }
 
     fun resumeReading() {
-        startReading(utterances)
+        var index = utterancesCurrentIndex
+        var first = true
+
+        for (i in index until utterances.size) {
+
+            if (first) {
+                textToSpeech?.speak(utterances[i], TextToSpeech.QUEUE_FLUSH, null, index.toString())
+                first = false
+            } else {
+                textToSpeech?.speak(utterances[i], TextToSpeech.QUEUE_ADD, null, index.toString())
+            }
+            index++
+        }
     }
 
     fun stopReading() {
         paused = false
-        textToSpeech.stop()
-        utterances.clear()
+        textToSpeech?.stop()
+//        utterances.clear()
+    }
+
+    private fun flushUtterancesQueue() {
+        textToSpeech?.speak("", TextToSpeech.QUEUE_FLUSH, null, null)
     }
 
 
-    fun getUtterances(baseURL: String, epubName: String, resourceHref: String): List<String> {
-        var plainTextFromHTML = ""
-
+    fun getUtterances(resourceUrl: String?) {
         val thread = Thread(Runnable {
-            val resourceURL: URL
-            val text: String?
+            try {
+                val document = Jsoup.connect(resourceUrl).get()
+                val elements = document.select("*")
+                val elementSize = elements.size
 
-            if (URI(resourceHref).isAbsolute) {
-                resourceURL = URL(resourceHref)
-            } else {
-                resourceURL = URL(baseURL + epubName + resourceHref)
+                var index2=0
+
+                for (i in 0 until elementSize) {
+                    val element = elements.eq(i)
+
+                    if (element.`is`("p") || element.`is`("h1") || element.`is`("h2") || element.`is`("h3")) {
+                        /*
+                         * Splitting the big paragraph into smaller paragraphs
+                         * (sentences by sentences)
+                         * These sentences will be passed onto TTS
+                         */
+                        val sentences = element.text().split(Regex("(?<=\\. |(,{1}))"))
+
+                        for (sentence in sentences) {
+                            var sentenceCleaned = sentence
+                            if (sentenceCleaned.isNotEmpty()) {
+                                if (sentenceCleaned.first() == ' ') sentenceCleaned = sentenceCleaned.removeRange(0, 1)
+                                if (sentenceCleaned.last() == ' ') sentenceCleaned = sentenceCleaned.removeRange(sentenceCleaned.length - 1, sentenceCleaned.length)
+                                utterances.add(sentenceCleaned)
+                                index2++
+                            }
+                        }
+                    }
+                }
+
+            } catch (e: IOException) {
+                e.printStackTrace()
             }
 
-            text = resourceURL.readText()
-            plainTextFromHTML = Html.fromHtml(text).toString().replace("\n".toRegex(), "").trim { it <= ' ' }
-            plainTextFromHTML = plainTextFromHTML.substring(plainTextFromHTML.indexOf('}') + 1)
         })
 
         thread.start()
         thread.join()
-
-        resourceLength = plainTextFromHTML.length
-
-        return plainTextFromHTML.split(".")
     }
 
 
 
     fun isTTSSpeaking(): Boolean {
-        return textToSpeech.isSpeaking
+        return textToSpeech?.isSpeaking!!
     }
 
     fun isPaused(): Boolean {
