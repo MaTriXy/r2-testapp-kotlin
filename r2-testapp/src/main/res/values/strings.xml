@@ -24,6 +24,9 @@
     <string name="epubactivity_set_bookmark">Add a bookmark</string>
     <string name="epubactivity_settings">User Settings</string>
     <string name="epubactivity_book_nav_options">Book navigation menu</string>
+    <string name="epubactivity_read_aloud_start">Read Aloud</string>
+    <string name="epubactivity_read_aloud_stop">Stop Read Aloud</string>
+
     <string name="epubactivity_accessibility">Accessibility</string>
     <string name="epubactivity_accessibility_screen_reader_start">Start Screen Reader</string>
     <string name="epubactivity_accessibility_screen_reader_pause">Pause Screen Reader</string>
